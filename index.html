@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Fixit Studio — Панель управления</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] },
+          colors: { accent: '#00AE42', accentHover: '#009638' },
+        },
+      },
+    };
+  </script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .modal-fade { animation: fadeIn 0.16s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal-pop { animation: popUp 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+    @keyframes popUp { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    /* Minimalist Toggle Switch */
+    .ui-switch {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      width: 40px;
+      height: 22px;
+      border-radius: 9999px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .ui-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .ui-switch-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 9999px;
+      background: rgba(113, 113, 122, 0.28);
+      transition: background 0.18s ease;
+    }
+    .ui-switch input:checked + .ui-switch-track { background: #00AE42; }
+    .ui-switch-knob {
+      position: absolute;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 9999px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.22);
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+    .ui-switch input:checked ~ .ui-switch-knob { transform: translateX(18px); }
+  </style>
+</head>
+<body class="bg-[#F6F6F8] text-[#111113] dark:bg-[#09090B] dark:text-[#F5F5F7] min-h-screen flex flex-col transition-colors duration-200">
+
+  <!-- Minimalist Top Header -->
+  <header class="sticky top-0 z-40 bg-white/85 dark:bg-[#09090B]/85 backdrop-blur-2xl border-b border-black/[0.06] dark:border-white/[0.08]">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-[#111113] dark:bg-white text-white dark:text-[#111113] flex items-center justify-center font-extrabold text-sm tracking-tighter">
+          FX
+        </div>
+        <div class="leading-tight">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-base sm:text-lg tracking-tight">Fixit Studio</span>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full bg-black/[0.05] dark:bg-white/[0.08] text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Admin</span>
+          </div>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <span id="connDot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            <span id="connStatusBadge" class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Ожидание входа</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="themeToggleBtn" type="button" aria-label="Сменить тему"
+          class="h-9 w-9 rounded-full border border-black/[0.08] dark:border-white/[0.1] hover:bg-[#F5F5F7] dark:hover:bg-[#161618] flex items-center justify-center transition-colors">
+          <span id="themeToggleIcon"></span>
+        </button>
+        <button id="logoutBtn" type="button"
+          class="hidden h-9 px-3.5 rounded-full border border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 text-xs font-semibold transition-colors">
+          Выйти
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+
+    <!-- Minimalist Login Screen -->
+    <section id="authSection" class="max-w-md mx-auto my-8 sm:my-12 rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-6 sm:p-8 shadow-xl shadow-black/[0.04] space-y-5">
+      <div class="text-center space-y-1.5">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-[#111113] dark:bg-white text-white dark:text-[#111113] flex items-center justify-center font-extrabold text-lg">FX</div>
+        <h1 class="text-xl font-bold tracking-tight pt-1">Вход в Fixit Studio</h1>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">База данных подключена автоматически. Введите почту и пароль администратора.</p>
+      </div>
+
+      <div class="space-y-3.5">
+        <div id="cloudKeyFields" class="space-y-3">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Supabase Project URL</label>
+            <div class="relative">
+              <input id="sbUrlInput" type="password" autocomplete="off" placeholder="https://your-project.supabase.co"
+                class="w-full h-11 pl-3.5 pr-11 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-xs focus:outline-none transition-colors" />
+              <button type="button" data-eye-target="sbUrlInput" aria-label="Показать или скрыть URL"
+                class="absolute inset-y-0 right-0 w-10 flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"></button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Supabase Anon Key</label>
+            <div class="relative">
+              <input id="sbKeyInput" type="password" autocomplete="off" placeholder="sb_publishable_..."
+                class="w-full h-11 pl-3.5 pr-11 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-xs focus:outline-none transition-colors" />
+              <button type="button" data-eye-target="sbKeyInput" aria-label="Показать или скрыть ключ"
+                class="absolute inset-y-0 right-0 w-10 flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3 pt-1">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Email администратора</label>
+            <div class="relative">
+              <input id="emailInput" type="password" autocomplete="username" placeholder="admin@fixit.kz"
+                class="w-full h-11 pl-3.5 pr-11 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none transition-colors" />
+              <button type="button" data-eye-target="emailInput" aria-label="Показать или скрыть почту"
+                class="absolute inset-y-0 right-0 w-10 flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"></button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Пароль</label>
+            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="••••••••"
+              class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none transition-colors" />
+          </div>
+        </div>
+
+        <button id="loginBtn" type="button"
+          class="w-full h-11 rounded-full bg-[#111113] hover:bg-accent dark:bg-white dark:hover:bg-accent dark:hover:text-white text-white dark:text-[#111113] font-semibold text-sm transition-colors shadow-sm">
+          Войти
+        </button>
+
+        <button id="toggleKeysBtn" type="button"
+          class="w-full text-center text-[11px] font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">
+          Показать настройки подключения (URL и ключ)
+        </button>
+      </div>
+    </section>
+
+    <!-- Authenticated Workspace -->
+    <section id="dashboardSection" class="hidden space-y-6">
+
+      <!-- Top Action Bar & Workspace Tabs -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+        <div class="inline-flex items-center rounded-full bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-1 self-start max-w-full overflow-x-auto no-scrollbar">
+          <button type="button" data-tab="products" class="h-9 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0">Товары</button>
+          <button type="button" data-tab="categories" class="h-9 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0">Категории</button>
+          <button type="button" data-tab="interface" class="h-9 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0">Интерфейс</button>
+          <button type="button" data-tab="settings" class="h-9 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0">Настройки</button>
+        </div>
+
+        <button id="addProductBtn" type="button"
+          class="h-11 px-5 rounded-full bg-accent hover:bg-accentHover text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-[#00AE42]/20 transition-all active:scale-[0.98] shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Добавить товар</span>
+        </button>
+      </div>
+
+      <!-- KPI Strip -->
+      <div id="statsGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"></div>
+
+      <!-- TAB 1: PRODUCTS -->
+      <div id="tabProducts" class="space-y-4">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div class="relative flex-1">
+            <div class="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
+            <input id="adminSearchInput" type="text" placeholder="Быстрый поиск по товарам..."
+              class="w-full h-10 pl-10 pr-4 rounded-full bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] text-sm focus:outline-none focus:border-accent" />
+          </div>
+          <select id="adminStatusFilter"
+            class="h-10 px-4 rounded-full bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] text-xs font-semibold focus:outline-none cursor-pointer">
+            <option value="all">Все статусы</option>
+            <option value="in_stock">В наличии</option>
+            <option value="preorder">Под заказ</option>
+            <option value="used">Только Б/У</option>
+            <option value="parts">На запчасти</option>
+          </select>
+        </div>
+
+        <div id="productList" class="grid grid-cols-1 gap-3"></div>
+      </div>
+
+      <!-- TAB 2: CATEGORIES -->
+      <div id="tabCategories" class="hidden rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 space-y-4">
+        <div>
+          <h3 class="font-bold text-lg tracking-tight">Категории витрины</h3>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Редактируйте названия на RU/KZ, добавляйте или удаляйте разделы — при переименовании товары обновляются автоматически.</p>
+        </div>
+        <div id="categoriesTags" class="space-y-2.5"></div>
+        <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+          <input id="newCatRu" type="text" placeholder="Название (RU), напр. 3D-изделия"
+            class="flex-1 h-11 px-4 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none" />
+          <input id="newCatKz" type="text" placeholder="Атауы (KZ, необязательно)"
+            class="flex-1 h-11 px-4 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none" />
+          <button id="addCategoryBtn" type="button"
+            class="h-11 px-5 rounded-full bg-[#111113] dark:bg-white text-white dark:text-[#111113] hover:bg-accent dark:hover:bg-accent dark:hover:text-white text-xs sm:text-sm font-semibold transition-colors shrink-0">
+            + Добавить раздел
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 3: INTERFACE & DESIGN CONSTRUCTOR -->
+      <div id="tabInterface" class="hidden space-y-5">
+
+        <!-- Brand & Color Studio -->
+        <div class="rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-lg tracking-tight">Дизайн, бренд и цвета витрины</h3>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Меняйте название компании, логотип, акцентный цвет, цвета фона, текста и бейджей.</p>
+            </div>
+            <button id="resetColorsBtn" type="button"
+              class="h-9 px-3.5 rounded-full border border-black/[0.1] dark:border-white/[0.12] text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+              Сбросить цвета
+            </button>
+          </div>
+
+          <!-- Live Mini Preview -->
+          <div id="uiColorPreview" class="rounded-2xl p-4 border border-black/[0.06] dark:border-white/[0.08] flex flex-wrap items-center justify-between gap-3 transition-colors" style="background:#111113;">
+            <div class="flex items-center gap-2.5">
+              <div id="previewLogoBox" class="w-8 h-8 rounded-lg bg-white text-[#111113] font-extrabold text-xs flex items-center justify-center">FX</div>
+              <div>
+                <div id="previewBrandName" class="font-bold text-sm text-white">Fixit</div>
+                <div class="text-[11px] text-zinc-400">Предпросмотр шапки и баннера</div>
+              </div>
+            </div>
+            <span id="previewAccentBtn" class="px-4 py-1.5 rounded-full text-white text-xs font-semibold" style="background:#00AE42;">Написать мастеру</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Название компании</label>
+              <input id="uiShopName" type="text" placeholder="Fixit"
+                class="w-full h-10 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm font-semibold focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Монограмма логотипа (2–3 буквы)</label>
+              <input id="uiLogoText" type="text" maxlength="3" placeholder="FX"
+                class="w-full h-10 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm font-bold uppercase focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Акцентный цвет (кнопки, бейджи)</label>
+              <div class="flex items-center gap-2">
+                <input id="uiAccentColor" type="color" value="#00AE42" class="h-10 w-12 rounded-xl cursor-pointer bg-transparent border-0" />
+                <input id="uiAccentHex" type="text" value="#00AE42" maxlength="7"
+                  class="flex-1 h-10 px-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-xs uppercase focus:outline-none" />
+              </div>
+              <div class="flex items-center gap-1.5 mt-2">
+                <button type="button" data-accent-preset="#00AE42" class="w-6 h-6 rounded-full bg-[#00AE42]" title="Зелёный Fixit"></button>
+                <button type="button" data-accent-preset="#2563EB" class="w-6 h-6 rounded-full bg-[#2563EB]" title="Синий"></button>
+                <button type="button" data-accent-preset="#F97316" class="w-6 h-6 rounded-full bg-[#F97316]" title="Оранжевый"></button>
+                <button type="button" data-accent-preset="#8B5CF6" class="w-6 h-6 rounded-full bg-[#8B5CF6]" title="Фиолетовый"></button>
+                <button type="button" data-accent-preset="#E11D48" class="w-6 h-6 rounded-full bg-[#E11D48]" title="Красный"></button>
+                <button type="button" data-accent-preset="#06B6D4" class="w-6 h-6 rounded-full bg-[#06B6D4]" title="Бирюзовый"></button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Фон главного баннера</label>
+              <div class="flex items-center gap-2">
+                <input id="uiHeroBgColor" type="color" value="#111113" class="h-10 w-12 rounded-xl cursor-pointer bg-transparent border-0" />
+                <input id="uiHeroBgHex" type="text" value="#111113" maxlength="7"
+                  class="flex-1 h-10 px-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-xs uppercase focus:outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Цвет заголовка баннера</label>
+              <div class="flex items-center gap-2">
+                <input id="uiHeroTextColor" type="color" value="#FFFFFF" class="h-10 w-12 rounded-xl cursor-pointer bg-transparent border-0" />
+                <input id="uiHeroTextHex" type="text" value="#FFFFFF" maxlength="7"
+                  class="flex-1 h-10 px-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-xs uppercase focus:outline-none" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Текст (Светлая)</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="uiTextLightColor" type="color" value="#111113" class="h-10 w-10 rounded-xl cursor-pointer bg-transparent border-0" />
+                  <input id="uiTextLightHex" type="text" value="#111113" maxlength="7"
+                    class="w-full h-10 px-2 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-[11px] uppercase focus:outline-none" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Текст (Тёмная)</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="uiTextDarkColor" type="color" value="#F5F5F7" class="h-10 w-10 rounded-xl cursor-pointer bg-transparent border-0" />
+                  <input id="uiTextDarkHex" type="text" value="#F5F5F7" maxlength="7"
+                    class="w-full h-10 px-2 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-[11px] uppercase focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Фон (Светлая)</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="uiPageBgLightColor" type="color" value="#FFFFFF" class="h-10 w-10 rounded-xl cursor-pointer bg-transparent border-0" />
+                  <input id="uiPageBgLightHex" type="text" value="#FFFFFF" maxlength="7"
+                    class="w-full h-10 px-2 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-[11px] uppercase focus:outline-none" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Фон (Тёмная)</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="uiPageBgDarkColor" type="color" value="#0A0A0B" class="h-10 w-10 rounded-xl cursor-pointer bg-transparent border-0" />
+                  <input id="uiPageBgDarkHex" type="text" value="#0A0A0B" maxlength="7"
+                    class="w-full h-10 px-2 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-[11px] uppercase focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            <div class="sm:col-span-2 grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Бейдж «Б/У»</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="uiBadgeUsedColor" type="color" value="#F97316" class="h-10 w-10 rounded-xl cursor-pointer bg-transparent border-0" />
+                  <input id="uiBadgeUsedHex" type="text" value="#F97316" maxlength="7"
+                    class="w-full h-10 px-2 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-[11px] uppercase focus:outline-none" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Бейдж «На запчасти»</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="uiBadgePartsColor" type="color" value="#DC2626" class="h-10 w-10 rounded-xl cursor-pointer bg-transparent border-0" />
+                  <input id="uiBadgePartsHex" type="text" value="#DC2626" maxlength="7"
+                    class="w-full h-10 px-2 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-[11px] uppercase focus:outline-none" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Статус «Под заказ»</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="uiBadgePreorderColor" type="color" value="#2563EB" class="h-10 w-10 rounded-xl cursor-pointer bg-transparent border-0" />
+                  <input id="uiBadgePreorderHex" type="text" value="#2563EB" maxlength="7"
+                    class="w-full h-10 px-2 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-[11px] uppercase focus:outline-none" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visibility Toggles -->
+        <div class="rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 space-y-5">
+          <div>
+            <h3 class="font-bold text-lg tracking-tight">Видимость блоков, фильтров и сортировки</h3>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Выключайте и возвращайте обратно любой элемент — например, «Сначала дешевле», баннер, поиск или фильтры.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-4 space-y-3">
+              <div class="text-xs font-bold uppercase tracking-wider text-zinc-500">Сортировка</div>
+              <div id="togglesSort" class="space-y-2.5"></div>
+            </div>
+            <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-4 space-y-3">
+              <div class="text-xs font-bold uppercase tracking-wider text-zinc-500">Фильтры каталога</div>
+              <div id="togglesFilters" class="space-y-2.5"></div>
+            </div>
+            <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-4 space-y-3">
+              <div class="text-xs font-bold uppercase tracking-wider text-zinc-500">Блоки и шапка</div>
+              <div id="togglesBlocks" class="space-y-2.5"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- All Banner & Bento Texts -->
+        <div class="rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 space-y-4">
+          <div>
+            <h3 class="font-bold text-lg tracking-tight">Тексты баннера и карточек преимуществ</h3>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Оставьте поле пустым, чтобы использовать текст по умолчанию.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Бейдж над заголовком (RU)</label>
+              <input id="cmsHeroCityRu" type="text" placeholder="Жезказган · В наличии и под заказ"
+                class="w-full h-10 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Тақырып үстіндегі белгі (KZ)</label>
+              <input id="cmsHeroCityKz" type="text" placeholder="Жезқазған · Бар және тапсырыспен"
+                class="w-full h-10 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Главный заголовок баннера (RU)</label>
+              <input id="cmsHeroTitleRu" type="text" placeholder="Запчасти, 3D-печатные изделия, комплектующие ПК и ремонт мелкой электроники"
+                class="w-full h-10 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Бас тақырып (KZ)</label>
+              <input id="cmsHeroTitleKz" type="text" placeholder="Бөлшектер, 3D-басылған бұйымдар..."
+                class="w-full h-10 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Подзаголовок баннера (RU)</label>
+              <textarea id="cmsHeroSubRu" rows="2" placeholder="Готовые 3D-печатные детали, запчасти, платы..."
+                class="w-full p-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Қосымша мәтін (KZ)</label>
+              <textarea id="cmsHeroSubKz" rows="2" placeholder="Дайын 3D-бөлшектер, платалар..."
+                class="w-full p-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent"></textarea>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Кнопка WhatsApp (RU)</label>
+              <input id="cmsWaBtnRu" type="text" placeholder="Написать мастеру"
+                class="w-full h-10 px-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-xs focus:outline-none focus:ring-1 focus:ring-accent" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Кнопка карты (RU)</label>
+              <input id="cmsMapBtnRu" type="text" placeholder="Мы на карте"
+                class="w-full h-10 px-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-xs focus:outline-none focus:ring-1 focus:ring-accent" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-zinc-500 mb-1.5">Текст в строке поиска (RU)</label>
+              <input id="cmsSearchPhRu" type="text" placeholder="Поиск товаров..."
+                class="w-full h-10 px-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-xs focus:outline-none focus:ring-1 focus:ring-accent" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
+            <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-3.5 space-y-2">
+              <div class="text-xs font-bold text-zinc-500 uppercase">Карточка 1</div>
+              <input id="cmsB1Title" type="text" placeholder="Готовые 3D-печатные изделия и детали" class="w-full h-9 px-3 rounded-xl bg-white dark:bg-[#131316] text-xs font-semibold focus:outline-none" />
+              <input id="cmsB1Sub" type="text" placeholder="Детали, корпуса, крепления и полезные аксессуары" class="w-full h-9 px-3 rounded-xl bg-white dark:bg-[#131316] text-xs focus:outline-none" />
+            </div>
+            <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-3.5 space-y-2">
+              <div class="text-xs font-bold text-zinc-500 uppercase">Карточка 2</div>
+              <input id="cmsB2Title" type="text" placeholder="Пайка и ремонт мелкой электроники" class="w-full h-9 px-3 rounded-xl bg-white dark:bg-[#131316] text-xs font-semibold focus:outline-none" />
+              <input id="cmsB2Sub" type="text" placeholder="Замена разъёмов, кабелей, плат и апгрейд ПК" class="w-full h-9 px-3 rounded-xl bg-white dark:bg-[#131316] text-xs focus:outline-none" />
+            </div>
+            <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-3.5 space-y-2">
+              <div class="text-xs font-bold text-zinc-500 uppercase">Карточка 3</div>
+              <input id="cmsB3Title" type="text" placeholder="Быстрый самовывоз в Жезказгане" class="w-full h-9 px-3 rounded-xl bg-white dark:bg-[#131316] text-xs font-semibold focus:outline-none" />
+              <input id="cmsB3Sub" type="text" placeholder="Проверка на месте или доставка по городу" class="w-full h-9 px-3 rounded-xl bg-white dark:bg-[#131316] text-xs focus:outline-none" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Labels for All Blocks, Filters, Sort & Buttons -->
+        <div class="rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="font-bold text-lg tracking-tight">Названия блоков, фильтров, сортировки и кнопок</h3>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Переименуйте любой элемент каталога на свой вкус. Пустое поле = стандартное название.</p>
+            </div>
+            <button id="resetLabelsBtn" type="button"
+              class="h-9 px-3.5 rounded-full border border-black/[0.1] dark:border-white/[0.12] text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+              Сбросить названия
+            </button>
+          </div>
+
+          <div id="customLabelsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+          <div class="pt-2">
+            <button id="saveContentBtn" type="button"
+              class="h-11 px-6 rounded-full bg-accent hover:bg-accentHover text-white text-sm font-semibold shadow-lg shadow-[#00AE42]/20 transition-all">
+              Сохранить интерфейс на витрину
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: SETTINGS -->
+      <div id="tabSettings" class="hidden rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 space-y-5">
+        <div>
+          <h3 class="font-bold text-lg tracking-tight">Настройки магазина и доставки</h3>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Контакты для заказов в WhatsApp, город, стоимость доставки и ссылка на 2GIS.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Название магазина</label>
+            <input id="setShopName" type="text" class="w-full h-11 px-4 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">WhatsApp (без +)</label>
+            <input id="setWhatsapp" type="tel" class="w-full h-11 px-4 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Город</label>
+            <input id="setCity" type="text" class="w-full h-11 px-4 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Доставка по городу (₸)</label>
+            <input id="setDeliveryFee" type="number" min="0" step="50" value="600" class="w-full h-11 px-4 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-accent" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Ссылка на карту 2GIS</label>
+          <input id="cmsMapUrl" type="url" placeholder="https://2gis.kz/..."
+            class="w-full h-11 px-4 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] text-sm focus:outline-none focus:ring-1 focus:ring-accent" />
+        </div>
+        <div>
+          <button id="saveSettingsBtn" type="button"
+            class="h-11 px-6 rounded-full bg-[#111113] dark:bg-white text-white dark:text-[#111113] hover:bg-accent dark:hover:bg-accent dark:hover:text-white text-sm font-semibold transition-colors">
+            Сохранить настройки
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Add / Edit Product Modal -->
+  <div id="editorModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 modal-fade">
+    <div class="bg-white dark:bg-[#131316] w-full sm:max-w-2xl max-h-[92vh] rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl border border-black/[0.08] dark:border-white/[0.1] modal-pop">
+      <div class="px-6 py-4 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between shrink-0">
+        <div>
+          <h3 id="editorTitle" class="text-lg font-bold tracking-tight">Новый товар</h3>
+          <p class="text-[11px] text-zinc-400">Заполните карточку — после сохранения товар сразу появится на витрине</p>
+        </div>
+        <button id="closeEditorBtn" type="button" class="w-9 h-9 rounded-full hover:bg-[#F5F5F7] dark:hover:bg-[#1E1E22] flex items-center justify-center text-zinc-500">✕</button>
+      </div>
+
+      <form id="productForm" class="overflow-y-auto p-5 sm:p-6 space-y-5">
+        <input type="hidden" id="prodId" />
+
+        <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] border border-dashed border-black/[0.12] dark:border-white/[0.14] p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">Фото и видео</span>
+              <p class="text-[11px] text-zinc-400">Первое фото станет обложкой карточки</p>
+            </div>
+            <div class="flex gap-2">
+              <label class="h-9 px-3.5 rounded-full bg-[#111113] dark:bg-white text-white dark:text-[#111113] text-xs font-semibold cursor-pointer hover:opacity-90 flex items-center gap-1.5">
+                <span>+ Фото</span>
+                <input id="uploadPhoto" type="file" accept="image/*" multiple class="hidden" />
+              </label>
+              <label class="h-9 px-3.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5">
+                <span>+ Видео</span>
+                <input id="uploadVideo" type="file" accept="video/*" multiple class="hidden" />
+              </label>
+            </div>
+          </div>
+          <div id="mediaPreview" class="grid grid-cols-3 sm:grid-cols-4 gap-2.5"></div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Название (Русский) *</label>
+            <input id="fTitleRu" type="text" required placeholder="Напр. Плата TP4056 Type-C"
+              class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Атауы (Қазақша)</label>
+            <input id="fTitleKz" type="text" placeholder="Необязательно"
+              class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-3.5 space-y-2">
+            <label class="block text-xs font-bold text-zinc-600 dark:text-zinc-300">Состояние товара</label>
+            <input type="hidden" id="fCondition" value="Новый" />
+            <div class="grid grid-cols-3 gap-1.5">
+              <button type="button" data-cond-pick="Новый" class="h-10 rounded-xl text-xs font-bold transition-all">Новый</button>
+              <button type="button" data-cond-pick="Б/У" class="h-10 rounded-xl text-xs font-bold transition-all">Б/У</button>
+              <button type="button" data-cond-pick="На запчасти" class="h-10 rounded-xl text-[11px] font-bold transition-all px-1">На запчасти</button>
+            </div>
+          </div>
+
+          <div class="rounded-2xl bg-[#F6F6F8] dark:bg-[#1A1A1E] p-3.5 space-y-2">
+            <label class="block text-xs font-bold text-zinc-600 dark:text-zinc-300">Статус наличия</label>
+            <input type="hidden" id="fAvailability" value="in_stock" />
+            <div class="grid grid-cols-2 gap-1.5">
+              <button type="button" data-avail-pick="in_stock" class="h-10 rounded-xl text-xs font-bold transition-all">В наличии</button>
+              <button type="button" data-avail-pick="preorder" class="h-10 rounded-xl text-xs font-bold transition-all">Под заказ</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="leadTimeBox" class="hidden rounded-2xl bg-blue-500/[0.08] border border-blue-500/25 p-4 space-y-2.5">
+          <label class="block text-xs font-bold text-blue-600 dark:text-blue-300">Срок доставки или изготовления (опционально)</label>
+          <input id="fLeadTime" type="text" placeholder="Например: 5–10 дней или от 1 дня"
+            class="w-full h-10 px-3.5 rounded-xl bg-white dark:bg-[#131316] border border-blue-500/20 text-sm focus:outline-none focus:border-blue-500" />
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" data-lead-chip="1–2 дня" class="px-2.5 py-1 rounded-lg bg-white dark:bg-[#131316] text-[11px] font-semibold hover:bg-blue-600 hover:text-white transition-colors">1–2 дня</button>
+            <button type="button" data-lead-chip="3–5 дней" class="px-2.5 py-1 rounded-lg bg-white dark:bg-[#131316] text-[11px] font-semibold hover:bg-blue-600 hover:text-white transition-colors">3–5 дней</button>
+            <button type="button" data-lead-chip="5–10 дней" class="px-2.5 py-1 rounded-lg bg-white dark:bg-[#131316] text-[11px] font-semibold hover:bg-blue-600 hover:text-white transition-colors">5–10 дней</button>
+            <button type="button" data-lead-chip="7–14 дней" class="px-2.5 py-1 rounded-lg bg-white dark:bg-[#131316] text-[11px] font-semibold hover:bg-blue-600 hover:text-white transition-colors">7–14 дней</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Цена (₸) *</label>
+              <span id="liveFreeTag" class="hidden text-[10px] font-bold text-accent">Бесплатно</span>
+            </div>
+            <input id="fPrice" type="number" min="0" step="1" required placeholder="0 = Бесплатно"
+              class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm font-semibold focus:outline-none" />
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Старая цена</label>
+              <span id="liveDiscountTag" class="hidden text-[10px] font-bold text-rose-500"></span>
+            </div>
+            <input id="fOldPrice" type="number" min="0" step="1" placeholder="Для скидки"
+              class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Количество *</label>
+            <input id="fStock" type="number" min="0" step="1" required
+              class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm font-semibold focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Артикул</label>
+            <input id="fSku" type="text" placeholder="FX-101"
+              class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none" />
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Категория (нажми на чип или впиши новую) *</label>
+          <input id="fCategory" type="text" required placeholder="Напр. 3D-изделия"
+            class="w-full h-11 px-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none" />
+          <div id="categoryChips" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Описание (RU)</label>
+            <textarea id="fDescRu" rows="3" placeholder="Кратко о товаре (ссылки https:// станут кликабельными)..."
+              class="w-full p-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Сипаттама (KZ)</label>
+            <textarea id="fDescKz" rows="3" placeholder="Қазақша сипаттама..."
+              class="w-full p-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none"></textarea>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Характеристики (каждая с новой строки: Параметр: Значение)</label>
+          <textarea id="fSpecs" rows="2" placeholder="Материал: PETG&#10;Гарантия: 14 дней"
+            class="w-full p-3.5 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-sm focus:outline-none"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.08]">
+          <button id="cancelEditorBtn" type="button" class="h-11 px-5 rounded-full border border-black/[0.08] dark:border-white/[0.1] text-sm font-semibold hover:bg-[#F5F5F7] dark:hover:bg-[#1E1E22]">Отмена</button>
+          <button type="submit" class="h-11 px-6 rounded-full bg-accent hover:bg-accentHover text-white text-sm font-semibold shadow-lg shadow-[#00AE42]/20 transition-all">Сохранить в базу</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sandbox-safe Confirm Modal -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 modal-fade">
+    <div class="bg-white dark:bg-[#131316] w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-black/[0.08] dark:border-white/[0.1] modal-pop">
+      <h4 id="confirmTitle" class="font-bold text-base">Удалить товар?</h4>
+      <p id="confirmMessage" class="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">Товар будет удалён из базы Supabase и исчезнет с витрины.</p>
+      <div class="mt-5 flex justify-end gap-2">
+        <button id="confirmCancelBtn" type="button" class="h-9 px-4 rounded-full border border-black/[0.08] dark:border-white/[0.1] text-xs font-semibold">Отмена</button>
+        <button id="confirmOkBtn" type="button" class="h-9 px-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold">Удалить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed top-20 left-1/2 -translate-x-1/2 z-[70] pointer-events-none flex flex-col items-center gap-2"></div>
+
+  <script>
+    // =========================================================================
+    // SUPABASE CLOUD CONFIG (Уже заполнено — готово к загрузке на хостинг!)
+    // =========================================================================
+    const CLOUD_CONFIG = {
+      supabaseUrl: 'https://fsnupacvoperkasnjrut.supabase.co',
+      supabaseAnonKey: 'sb_publishable_wPUxwycpBu5vPSIhkHhYrw_Ddl2fLHM',
+    };
+
+    const DEFAULT_CATEGORIES = [
+      { id: 'Комплектующие ПК', ru: 'Комплектующие ПК', kz: 'ДК бөлшектері' },
+      { id: 'Запчасти', ru: 'Запчасти', kz: 'Қосалқы бөлшектер' },
+      { id: 'Провода и питание', ru: 'Провода и питание', kz: 'Кабельдер мен қуат' },
+      { id: 'Платы и модули', ru: 'Платы и модули', kz: 'Платалар мен модульдер' },
+      { id: 'Расходники', ru: 'Расходники', kz: 'Шығын материалдары' },
+      { id: '3D-изделия', ru: '3D-изделия', kz: '3D-бұйымдар' },
+    ];
+
+    const UI_TOGGLE_GROUPS = {
+      togglesSort: [
+        ['showSort', 'Блок сортировки'],
+        ['showSortNewest', '«Сначала новинки»'],
+        ['showSortPriceAsc', '«Сначала дешевле»'],
+        ['showSortPriceDesc', '«Сначала дороже»'],
+      ],
+      togglesFilters: [
+        ['showConditionFilter', 'Фильтр «Состояние»'],
+        ['showCondNew', 'Пункт «Новый»'],
+        ['showCondUsed', 'Пункт «Б/У»'],
+        ['showCondParts', 'Пункт «На запчасти»'],
+        ['showAvailabilityFilter', 'Фильтр «Наличие»'],
+      ],
+      togglesBlocks: [
+        ['showHero', 'Главный баннер'],
+        ['showHeroBadge', 'Бейдж города в баннере'],
+        ['showHeroWhatsapp', 'Кнопка «Написать мастеру»'],
+        ['showHeroMap', 'Кнопка «Мы на карте»'],
+        ['showBento', '3 карточки преимуществ'],
+        ['showSearch', 'Строка поиска'],
+        ['showCategories', 'Полоса категорий'],
+        ['showFoundCount', 'Счётчик «Найдено»'],
+        ['showViewSwitcher', 'Переключатель Сетка/Список'],
+        ['showThemeToggle', 'Кнопка смены темы'],
+        ['showLangToggle', 'Кнопка языка RU/KZ'],
+      ],
+    };
+
+    const CUSTOM_LABELS_SPEC = [
+      ['lblAllProducts', 'Кнопка «Все товары»', 'Все товары'],
+      ['lblFiltersBtn', 'Кнопка «Фильтры» (моб.)', 'Фильтры'],
+      ['lblCondAll', 'Фильтр «Состояние: Все»', 'Состояние: Все'],
+      ['lblCondNew', 'Пункт «Новый»', 'Новый'],
+      ['lblCondUsed', 'Бейдж и пункт «Б/У»', 'Б/У'],
+      ['lblCondParts', 'Бейдж и пункт «На запчасти»', 'На запчасти'],
+      ['lblAvailAll', 'Фильтр «Наличие: Все»', 'Наличие: Все'],
+      ['lblAvailInStock', 'Статус «В наличии»', 'В наличии'],
+      ['lblAvailPreorder', 'Статус «Под заказ»', 'Под заказ'],
+      ['lblSortNewest', 'Сортировка «Сначала новинки»', 'Сначала новинки'],
+      ['lblSortPriceAsc', 'Сортировка «Сначала дешевле»', 'Сначала дешевле'],
+      ['lblSortPriceDesc', 'Сортировка «Сначала дороже»', 'Сначала дороже'],
+      ['lblAddToCart', 'Кнопка «В корзину»', 'В корзину'],
+      ['lblOrderPreorder', 'Кнопка «Заказать» (под заказ)', 'Заказать'],
+      ['lblNewArrival', 'Бейдж «Новинка»', 'Новинка'],
+      ['lblFree', 'Метка «Бесплатно»', 'Бесплатно'],
+      ['lblOutOfStock', 'Статус «Нет в наличии»', 'Нет в наличии'],
+      ['lblCartTitle', 'Заголовок «Корзина»', 'Корзина'],
+      ['lblCheckoutWa', 'Кнопка заказа в WhatsApp', 'Оформить в WhatsApp'],
+    ];
+
+    let sb = null;
+    let products = [];
+    let categories = [...DEFAULT_CATEGORIES];
+    let uiFlags = {};
+    let editorMedia = [];
+    let theme = 'light';
+    let activeTab = 'products';
+    let adminSearch = '';
+    let adminStatusFilter = 'all';
+    let confirmAction = null;
+
+    function safeLoad(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
+    function safeSave(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+    function formatPrice(n) { return (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₸'; }
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function toast(msg) {
+      const c = document.getElementById('toastContainer');
+      const d = document.createElement('div');
+      d.className = 'px-4 py-2.5 rounded-full bg-[#111113] dark:bg-white text-white dark:text-[#111113] text-xs font-semibold shadow-xl modal-pop';
+      d.textContent = msg; c.appendChild(d);
+      setTimeout(() => d.remove(), 2400);
+    }
+
+    function applyTheme() {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      safeSave('fixit_adm_clean_theme', theme);
+      document.getElementById('themeToggleIcon').innerHTML = theme === 'dark'
+        ? '<svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
+        : '<svg class="w-4 h-4 text-zinc-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+    }
+
+    function setTab(tab) {
+      activeTab = tab;
+      document.getElementById('tabProducts').classList.toggle('hidden', tab !== 'products');
+      document.getElementById('tabCategories').classList.toggle('hidden', tab !== 'categories');
+      document.getElementById('tabInterface').classList.toggle('hidden', tab !== 'interface');
+      document.getElementById('tabSettings').classList.toggle('hidden', tab !== 'settings');
+      document.querySelectorAll('[data-tab]').forEach((b) => {
+        const on = b.getAttribute('data-tab') === tab;
+        b.className = on
+          ? 'h-9 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 bg-[#111113] dark:bg-white text-white dark:text-[#111113]'
+          : 'h-9 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 text-zinc-500 hover:text-zinc-900 dark:hover:text-white';
+      });
+    }
+
+    function renderInterfaceToggles() {
+      Object.entries(UI_TOGGLE_GROUPS).forEach(([containerId, items]) => {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+        el.innerHTML = items.map(([key, label]) => `
+          <label class="flex items-center justify-between gap-2 text-xs font-medium cursor-pointer select-none">
+            <span class="text-zinc-700 dark:text-zinc-200">${esc(label)}</span>
+            <span class="ui-switch">
+              <input type="checkbox" data-ui-toggle="${key}" ${uiFlags[key] !== false ? 'checked' : ''} />
+              <span class="ui-switch-track"></span>
+              <span class="ui-switch-knob"></span>
+            </span>
+          </label>`).join('');
+        el.querySelectorAll('[data-ui-toggle]').forEach((inp) => {
+          inp.addEventListener('change', () => { uiFlags[inp.getAttribute('data-ui-toggle')] = inp.checked; });
+        });
+      });
+    }
+
+    function syncColorPreview() {
+      const accent = document.getElementById('uiAccentHex').value.trim() || '#00AE42';
+      const heroBg = document.getElementById('uiHeroBgHex').value.trim() || '#111113';
+      const heroTxt = document.getElementById('uiHeroTextHex').value.trim() || '#FFFFFF';
+      const shop = document.getElementById('uiShopName').value.trim() || document.getElementById('setShopName').value.trim() || 'Fixit';
+      const logo = (document.getElementById('uiLogoText').value.trim() || shop.slice(0, 2) || 'FX').toUpperCase().slice(0, 3);
+      document.getElementById('uiColorPreview').style.background = heroBg;
+      document.getElementById('previewBrandName').textContent = shop;
+      document.getElementById('previewBrandName').style.color = heroTxt;
+      document.getElementById('previewLogoBox').textContent = logo;
+      document.getElementById('previewAccentBtn').style.background = accent;
+    }
+
+    function bindColorPair(pickerId, hexId) {
+      const p = document.getElementById(pickerId);
+      const h = document.getElementById(hexId);
+      p.addEventListener('input', () => { h.value = p.value.toUpperCase(); syncColorPreview(); });
+      h.addEventListener('input', () => {
+        if (/^#[0-9a-f]{6}$/i.test(h.value.trim())) { p.value = h.value.trim(); syncColorPreview(); }
+      });
+    }
+
+    function updateConditionUI(val) {
+      const low = String(val || '').toLowerCase();
+      const normalized = (low === 'parts' || low.includes('на запчасти')) ? 'На запчасти' : ((low === 'used' || low.includes('б/у')) ? 'Б/У' : 'Новый');
+      document.getElementById('fCondition').value = normalized;
+      document.querySelectorAll('[data-cond-pick]').forEach((b) => {
+        const pick = b.getAttribute('data-cond-pick');
+        const active = pick === normalized;
+        if (active && pick === 'На запчасти') b.className = 'h-10 rounded-xl text-[11px] font-extrabold transition-all px-1 bg-red-600 text-white shadow-sm';
+        else if (active && pick === 'Б/У') b.className = 'h-10 rounded-xl text-xs font-extrabold transition-all bg-orange-500 text-white shadow-sm';
+        else if (active) b.className = 'h-10 rounded-xl text-xs font-bold transition-all bg-[#111113] dark:bg-white text-white dark:text-[#111113] shadow-sm';
+        else b.className = 'h-10 rounded-xl text-[11px] font-semibold transition-all px-1 bg-white dark:bg-[#131316] text-zinc-500 hover:text-zinc-900 dark:hover:text-white';
+      });
+    }
+
+    function updateAvailabilityUI(val) {
+      const normalized = val === 'preorder' ? 'preorder' : 'in_stock';
+      document.getElementById('fAvailability').value = normalized;
+      document.getElementById('leadTimeBox').classList.toggle('hidden', normalized !== 'preorder');
+      document.querySelectorAll('[data-avail-pick]').forEach((b) => {
+        const pick = b.getAttribute('data-avail-pick');
+        const active = pick === normalized;
+        if (active && pick === 'preorder') b.className = 'h-10 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-sm';
+        else if (active) b.className = 'h-10 rounded-xl text-xs font-bold transition-all bg-accent text-white shadow-sm';
+        else b.className = 'h-10 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-[#131316] text-zinc-500 hover:text-zinc-900 dark:hover:text-white';
+      });
+    }
+
+    function updateLivePriceTags() {
+      const p = Number(document.getElementById('fPrice').value);
+      const oldP = Number(document.getElementById('fOldPrice').value);
+      document.getElementById('liveFreeTag').classList.toggle('hidden', !(document.getElementById('fPrice').value !== '' && p <= 0));
+      const discEl = document.getElementById('liveDiscountTag');
+      if (oldP > p && p > 0) {
+        discEl.textContent = `-${Math.round((1 - p / oldP) * 100)}%`;
+        discEl.classList.remove('hidden');
+      } else {
+        discEl.classList.add('hidden');
+      }
+    }
+
+    function normalizeSbUrl(raw) {
+      let u = String(raw || '').trim().replace(/\/+$/, '');
+      if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u;
+      return u;
+    }
+
+    async function connectAndLoad(url, key) {
+      try {
+        const cleanUrl = normalizeSbUrl(url);
+        const cleanKey = String(key || '').trim();
+        if (!cleanUrl || !cleanKey || !window.supabase) return;
+        sb = window.supabase.createClient(cleanUrl, cleanKey);
+        const { data: sess, error } = await sb.auth.getSession();
+        if (error) { toast('Ошибка сессии: ' + error.message); return; }
+        if (sess && sess.session) {
+          showDashboard();
+          await refreshData();
+        }
+      } catch (err) {
+        toast('Ошибка подключения: ' + (err && err.message ? err.message : 'проверьте URL и ключ'));
+      }
+    }
+
+    function showDashboard() {
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('dashboardSection').classList.remove('hidden');
+      document.getElementById('logoutBtn').classList.remove('hidden');
+      document.getElementById('connDot').className = 'w-1.5 h-1.5 rounded-full bg-accent';
+      document.getElementById('connStatusBadge').textContent = 'База подключена';
+      setTab(activeTab);
+    }
+
+    function collectSiteContent() {
+      const content = {
+        logoText: document.getElementById('uiLogoText').value.trim().toUpperCase(),
+        deliveryFee: Math.max(0, Number(document.getElementById('setDeliveryFee').value) || 0),
+        accentColor: document.getElementById('uiAccentHex').value.trim(),
+        heroBgColor: document.getElementById('uiHeroBgHex').value.trim(),
+        heroTextColor: document.getElementById('uiHeroTextHex').value.trim(),
+        textColorLight: document.getElementById('uiTextLightHex').value.trim(),
+        textColorDark: document.getElementById('uiTextDarkHex').value.trim(),
+        pageBgLight: document.getElementById('uiPageBgLightHex').value.trim(),
+        pageBgDark: document.getElementById('uiPageBgDarkHex').value.trim(),
+        badgeUsedColor: document.getElementById('uiBadgeUsedHex').value.trim(),
+        badgePartsColor: document.getElementById('uiBadgePartsHex').value.trim(),
+        badgePreorderColor: document.getElementById('uiBadgePreorderHex').value.trim(),
+        heroCityRu: document.getElementById('cmsHeroCityRu').value.trim(),
+        heroCityKz: document.getElementById('cmsHeroCityKz').value.trim(),
+        heroTitleRu: document.getElementById('cmsHeroTitleRu').value.trim(),
+        heroTitleKz: document.getElementById('cmsHeroTitleKz').value.trim(),
+        heroSubtitleRu: document.getElementById('cmsHeroSubRu').value.trim(),
+        heroSubtitleKz: document.getElementById('cmsHeroSubKz').value.trim(),
+        heroWaBtnRu: document.getElementById('cmsWaBtnRu').value.trim(),
+        heroMapBtnRu: document.getElementById('cmsMapBtnRu').value.trim(),
+        searchPlaceholderRu: document.getElementById('cmsSearchPhRu').value.trim(),
+        bento1TitleRu: document.getElementById('cmsB1Title').value.trim(),
+        bento1SubRu: document.getElementById('cmsB1Sub').value.trim(),
+        bento2TitleRu: document.getElementById('cmsB2Title').value.trim(),
+        bento2SubRu: document.getElementById('cmsB2Sub').value.trim(),
+        bento3TitleRu: document.getElementById('cmsB3Title').value.trim(),
+        bento3SubRu: document.getElementById('cmsB3Sub').value.trim(),
+        mapUrl: document.getElementById('cmsMapUrl').value.trim(),
+      };
+      Object.values(UI_TOGGLE_GROUPS).flat().forEach(([key]) => { content[key] = uiFlags[key] !== false; });
+      CUSTOM_LABELS_SPEC.forEach(([key]) => {
+        const inp = document.getElementById('ui_' + key);
+        if (inp) content[key] = inp.value.trim();
+      });
+      return content;
+    }
+
+    function populateSiteContent(sc) {
+      const s = (sc && typeof sc === 'object') ? sc : {};
+      document.getElementById('uiLogoText').value = s.logoText || 'FX';
+      document.getElementById('setDeliveryFee').value = (s.deliveryFee !== undefined && s.deliveryFee !== '') ? Number(s.deliveryFee) : 600;
+      const setColor = (pId, hId, val, fb) => {
+        const c = /^#[0-9a-f]{6}$/i.test(val || '') ? val.toUpperCase() : fb;
+        document.getElementById(pId).value = c;
+        document.getElementById(hId).value = c;
+      };
+      setColor('uiAccentColor', 'uiAccentHex', s.accentColor, '#00AE42');
+      setColor('uiHeroBgColor', 'uiHeroBgHex', s.heroBgColor, '#111113');
+      setColor('uiHeroTextColor', 'uiHeroTextHex', s.heroTextColor, '#FFFFFF');
+      setColor('uiTextLightColor', 'uiTextLightHex', s.textColorLight, '#111113');
+      setColor('uiTextDarkColor', 'uiTextDarkHex', s.textColorDark, '#F5F5F7');
+      setColor('uiPageBgLightColor', 'uiPageBgLightHex', s.pageBgLight, '#FFFFFF');
+      setColor('uiPageBgDarkColor', 'uiPageBgDarkHex', s.pageBgDark, '#0A0A0B');
+      setColor('uiBadgeUsedColor', 'uiBadgeUsedHex', s.badgeUsedColor, '#F97316');
+      setColor('uiBadgePartsColor', 'uiBadgePartsHex', s.badgePartsColor, '#DC2626');
+      setColor('uiBadgePreorderColor', 'uiBadgePreorderHex', s.badgePreorderColor, '#2563EB');
+
+      document.getElementById('cmsHeroCityRu').value = s.heroCityRu || '';
+      document.getElementById('cmsHeroCityKz').value = s.heroCityKz || '';
+      document.getElementById('cmsHeroTitleRu').value = s.heroTitleRu || '';
+      document.getElementById('cmsHeroTitleKz').value = s.heroTitleKz || '';
+      document.getElementById('cmsHeroSubRu').value = s.heroSubtitleRu || '';
+      document.getElementById('cmsHeroSubKz').value = s.heroSubtitleKz || '';
+      document.getElementById('cmsWaBtnRu').value = s.heroWaBtnRu || '';
+      document.getElementById('cmsMapBtnRu').value = s.heroMapBtnRu || '';
+      document.getElementById('cmsSearchPhRu').value = s.searchPlaceholderRu || '';
+      document.getElementById('cmsB1Title').value = s.bento1TitleRu || '';
+      document.getElementById('cmsB1Sub').value = s.bento1SubRu || '';
+      document.getElementById('cmsB2Title').value = s.bento2TitleRu || '';
+      document.getElementById('cmsB2Sub').value = s.bento2SubRu || '';
+      document.getElementById('cmsB3Title').value = s.bento3TitleRu || '';
+      document.getElementById('cmsB3Sub').value = s.bento3SubRu || '';
+      document.getElementById('cmsMapUrl').value = s.mapUrl || '';
+
+      uiFlags = {};
+      Object.values(UI_TOGGLE_GROUPS).flat().forEach(([key]) => { uiFlags[key] = s[key] !== false; });
+      renderInterfaceToggles();
+
+      const lblGrid = document.getElementById('customLabelsGrid');
+      if (lblGrid) {
+        lblGrid.innerHTML = CUSTOM_LABELS_SPEC.map(([key, title, ph]) => `
+          <div>
+            <label class="block text-[11px] font-semibold text-zinc-500 mb-1">${esc(title)}</label>
+            <input id="ui_${key}" type="text" value="${esc(s[key] || '')}" placeholder="${esc(ph)}"
+              class="w-full h-9 px-3 rounded-xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-transparent focus:border-accent text-xs focus:outline-none" />
+          </div>`).join('');
+      }
+      syncColorPreview();
+    }
+
+    async function saveSettingsRow() {
+      if (!sb) return;
+      const shopName = document.getElementById('uiShopName').value.trim() || document.getElementById('setShopName').value.trim() || 'Fixit';
+      document.getElementById('uiShopName').value = shopName;
+      document.getElementById('setShopName').value = shopName;
+      syncColorPreview();
+      try {
+        const corePayload = {
+          id: 1,
+          shop_name: shopName,
+          whatsapp: document.getElementById('setWhatsapp').value.replace(/\D/g, '') || '77762472933',
+          city: document.getElementById('setCity').value.trim() || 'Жезказган',
+        };
+        const fullPayload = { ...corePayload, categories, site_content: collectSiteContent() };
+        let { error } = await sb.from('store_settings').upsert(fullPayload);
+        if (error && /schema cache|column/i.test(String(error.message || ''))) {
+          const msg = String(error.message || '');
+          const retryPayload = { ...fullPayload };
+          if (msg.includes('site_content')) delete retryPayload.site_content;
+          if (msg.includes('categories')) delete retryPayload.categories;
+          const retry = await sb.from('store_settings').upsert(retryPayload);
+          if (!retry.error) { toast('Сохранено! Выполните supabase_setup.sql для всех полей интерфейса.'); return; }
+          error = retry.error;
+        }
+        if (error) toast('Ошибка настроек: ' + error.message);
+        else toast('Сохранено! Витрина обновлена.');
+      } catch (err) {
+        toast('Ошибка сохранения: ' + (err && err.message ? err.message : 'сбой сети'));
+      }
+    }
+
+    async function refreshData() {
+      if (!sb) return;
+      try {
+        const { data, error: prodErr } = await sb.from('products').select('*').order('created_at', { ascending: false });
+        if (prodErr) toast('Ошибка загрузки товаров: ' + prodErr.message);
+        else products = Array.isArray(data) ? data : [];
+
+        const { data: sRow, error: setErr } = await sb.from('store_settings').select('*').eq('id', 1).maybeSingle();
+        if (setErr) {
+          toast('Ошибка загрузки настроек: ' + setErr.message);
+        } else if (sRow) {
+          const name = sRow.shop_name || 'Fixit';
+          document.getElementById('setShopName').value = name;
+          document.getElementById('uiShopName').value = name;
+          document.getElementById('setWhatsapp').value = sRow.whatsapp || '77762472933';
+          document.getElementById('setCity').value = sRow.city || 'Жезказган';
+          if (Array.isArray(sRow.categories) && sRow.categories.length) {
+            categories = sRow.categories.filter((c) => c && (c.id || c.ru)).map((c) => ({
+              id: c.id || c.ru, ru: c.ru || c.id, kz: c.kz || c.ru || c.id,
+            }));
+          }
+          populateSiteContent(sRow.site_content);
+        }
+        renderCategories();
+        renderList();
+      } catch (err) {
+        toast('Сбой синхронизации: ' + (err && err.message ? err.message : 'проверьте сеть'));
+      }
+    }
+
+    function renderCategories() {
+      const box = document.getElementById('categoriesTags');
+      box.innerHTML = categories.map((c, i) => `
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2.5 rounded-2xl bg-[#F6F6F8] dark:bg-[#1B1B1F] border border-black/[0.05] dark:border-white/[0.06]">
+          <input type="text" data-cat-ru="${i}" value="${esc(c.ru)}" placeholder="Название (RU)"
+            class="flex-1 h-9 px-3 rounded-xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] text-xs font-semibold focus:outline-none focus:border-accent" />
+          <input type="text" data-cat-kz="${i}" value="${esc(c.kz || '')}" placeholder="Атауы (KZ)"
+            class="flex-1 h-9 px-3 rounded-xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] text-xs focus:outline-none focus:border-accent" />
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" data-save-cat="${i}"
+              class="h-9 px-3.5 rounded-xl bg-accent hover:bg-accentHover text-white text-xs font-semibold transition-colors">Сохранить</button>
+            <button type="button" data-del-cat="${i}" aria-label="Удалить категорию"
+              class="h-9 w-9 rounded-xl border border-rose-500/25 text-rose-500 hover:bg-rose-500/10 text-xs font-bold flex items-center justify-center transition-colors">✕</button>
+          </div>
+        </div>`).join('');
+
+      box.querySelectorAll('[data-save-cat]').forEach((b) => {
+        b.addEventListener('click', async () => {
+          const i = Number(b.getAttribute('data-save-cat'));
+          const oldId = categories[i].id;
+          const newRu = box.querySelector(`[data-cat-ru="${i}"]`).value.trim();
+          const newKz = box.querySelector(`[data-cat-kz="${i}"]`).value.trim() || newRu;
+          if (!newRu) { toast('Введите название категории'); return; }
+          if (categories.some((c, idx) => idx !== i && c.id.toLowerCase() === newRu.toLowerCase())) {
+            toast('Такая категория уже существует'); return;
+          }
+          categories[i] = { id: newRu, ru: newRu, kz: newKz };
+          if (sb && oldId && oldId !== newRu) {
+            const { error: updErr } = await sb.from('products').update({ category: newRu }).eq('category', oldId);
+            if (updErr) toast('Ошибка обновления товаров: ' + updErr.message);
+            else { products.forEach((p) => { if (p.category === oldId) p.category = newRu; }); renderList(); }
+          }
+          renderCategories();
+          await saveSettingsRow();
+        });
+      });
+
+      box.querySelectorAll('[data-del-cat]').forEach((b) => {
+        b.addEventListener('click', () => {
+          if (categories.length <= 1) { toast('Должна остаться хотя бы одна категория'); return; }
+          const idx = Number(b.getAttribute('data-del-cat'));
+          const catName = categories[idx] ? categories[idx].ru : '';
+          document.getElementById('confirmTitle').textContent = 'Удалить категорию?';
+          document.getElementById('confirmMessage').textContent = `Категория «${catName}» исчезнет из списка разделов (сами товары останутся в базе).`;
+          confirmAction = async () => { categories.splice(idx, 1); renderCategories(); await saveSettingsRow(); };
+          document.getElementById('confirmModal').classList.remove('hidden');
+        });
+      });
+
+      const catChips = document.getElementById('categoryChips');
+      catChips.innerHTML = categories
+        .map((c) => `<button type="button" data-cat-chip="${esc(c.id)}" class="px-3 py-1.5 rounded-full bg-[#F6F6F8] dark:bg-[#1B1B1F] hover:bg-accent hover:text-white text-xs font-semibold transition-colors">${esc(c.ru)}</button>`).join('');
+      catChips.querySelectorAll('[data-cat-chip]').forEach((b) => {
+        b.addEventListener('click', () => { document.getElementById('fCategory').value = b.getAttribute('data-cat-chip'); });
+      });
+    }
+
+    function isPreorderRow(p) { return p.availability === 'preorder' || String(p.condition || '').toLowerCase().includes('под заказ'); }
+    function isPartsRow(p) { const c = String(p.condition || '').toLowerCase(); return c === 'parts' || c.includes('на запчасти'); }
+    function isUsedRow(p) { const c = String(p.condition || '').toLowerCase(); return !isPartsRow(p) && (c === 'used' || c.includes('б/у')); }
+
+    function renderList() {
+      const inStockCnt = products.filter((p) => !isPreorderRow(p) && (Number(p.stock) || 0) > 0).length;
+      const preorderCnt = products.filter(isPreorderRow).length;
+      const totalVal = products.reduce((a, p) => a + (Number(p.price) || 0) * (Number(p.stock) || 0), 0);
+
+      document.getElementById('statsGrid').innerHTML = [
+        ['Всего товаров', products.length, ''],
+        ['В наличии', inStockCnt, 'text-accent'],
+        ['Под заказ', preorderCnt, 'text-blue-600 dark:text-blue-400'],
+        ['Сумма склада', formatPrice(totalVal), ''],
+      ].map(([l, v, cls]) => `
+        <div class="rounded-2xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-4">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">${l}</div>
+          <div class="text-xl sm:text-2xl font-bold tracking-tight mt-1 tabular-nums ${cls}">${v}</div>
+        </div>`).join('');
+
+      const q = adminSearch.trim().toLowerCase();
+      const filtered = products.filter((p) => {
+        if (adminStatusFilter === 'in_stock' && (isPreorderRow(p) || (Number(p.stock) || 0) <= 0)) return false;
+        if (adminStatusFilter === 'preorder' && !isPreorderRow(p)) return false;
+        if (adminStatusFilter === 'used' && !isUsedRow(p)) return false;
+        if (adminStatusFilter === 'parts' && !isPartsRow(p)) return false;
+        if (q && ![p.title_ru, p.title_kz, p.category, p.sku].join(' ').toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      const box = document.getElementById('productList');
+      if (filtered.length === 0) {
+        box.innerHTML = '<div class="rounded-3xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-12 text-center text-sm text-zinc-400">Товаров не найдено. Нажмите «+ Добавить товар».</div>';
+        return;
+      }
+
+      box.innerHTML = filtered.map((p) => {
+        const thumb = p.media && p.media[0] && p.media[0].type === 'image' ? p.media[0].url : '';
+        const pre = isPreorderRow(p);
+        const used = isUsedRow(p);
+        const parts = isPartsRow(p);
+        const priceHtml = Number(p.price) <= 0
+          ? '<span class="px-2 py-0.5 rounded-md bg-accent/15 text-accent font-bold text-xs">Бесплатно</span>'
+          : `<span class="font-bold text-sm tabular-nums">${formatPrice(p.price)}</span>`;
+        const statusBadge = pre
+          ? `<span class="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 text-[11px] font-bold">Под заказ${p.lead_time ? ' · ' + esc(p.lead_time) : ''}</span>`
+          : (Number(p.stock) > 0
+              ? `<span class="px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[11px] font-bold">В наличии: ${p.stock} шт.</span>`
+              : `<span class="px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-500 text-[11px] font-bold">Нет в наличии</span>`);
+
+        return `
+          <div class="rounded-2xl bg-white dark:bg-[#131316] border border-black/[0.06] dark:border-white/[0.08] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:border-black/[0.14] dark:hover:border-white/[0.16] transition-colors">
+            <div class="flex items-center gap-3.5 min-w-0">
+              <div class="w-14 h-14 rounded-xl overflow-hidden bg-[#F5F5F7] dark:bg-[#1C1C1F] shrink-0">${thumb ? `<img src="${esc(thumb)}" loading="lazy" decoding="async" class="w-full h-full object-cover" />` : ''}</div>
+              <div class="min-w-0 space-y-1">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="text-[11px] font-semibold text-zinc-400">${esc(p.category)}</span>
+                  ${parts ? '<span class="px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-extrabold">На запчасти</span>' : used ? '<span class="px-1.5 py-0.5 rounded bg-orange-500 text-white text-[10px] font-extrabold">Б/У</span>' : ''}
+                  ${statusBadge}
+                </div>
+                <div class="font-bold text-sm sm:text-base truncate">${esc(p.title_ru)}</div>
+                <div class="flex items-center gap-2">${priceHtml}</div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/[0.05] dark:border-white/[0.06]">
+              ${!pre ? `
+                <div class="inline-flex items-center rounded-full border border-black/[0.08] dark:border-white/[0.1] bg-[#F6F6F8] dark:bg-[#1B1B1F] overflow-hidden">
+                  <button type="button" data-qdec="${p.id}" class="w-8 h-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 font-bold">−</button>
+                  <span class="w-7 text-center text-xs font-bold tabular-nums">${p.stock}</span>
+                  <button type="button" data-qinc="${p.id}" class="w-8 h-8 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 font-bold">+</button>
+                </div>` : ''}
+              <div class="flex items-center gap-1.5">
+                <button type="button" data-edit="${p.id}" class="h-9 px-3.5 rounded-full bg-[#F5F5F7] dark:bg-[#1E1E22] hover:bg-[#111113] hover:text-white dark:hover:bg-white dark:hover:text-[#111113] text-xs font-semibold transition-colors">Изменить</button>
+                <button type="button" data-del="${p.id}" class="h-9 px-3.5 rounded-full border border-rose-500/25 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 text-xs font-semibold transition-colors">Удалить</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      box.querySelectorAll('[data-qdec]').forEach((b) => b.addEventListener('click', () => quickStepStock(b.getAttribute('data-qdec'), -1)));
+      box.querySelectorAll('[data-qinc]').forEach((b) => b.addEventListener('click', () => quickStepStock(b.getAttribute('data-qinc'), 1)));
+      box.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openEditor(b.getAttribute('data-edit'))));
+      box.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
+        const id = b.getAttribute('data-del');
+        document.getElementById('confirmTitle').textContent = 'Удалить товар?';
+        document.getElementById('confirmMessage').textContent = 'Товар будет удалён из базы Supabase и исчезнет с витрины.';
+        confirmAction = async () => {
+          const { error } = await sb.from('products').delete().eq('id', id);
+          if (error) { toast('Ошибка удаления: ' + error.message); return; }
+          toast('Товар удалён');
+          refreshData();
+        };
+        document.getElementById('confirmModal').classList.remove('hidden');
+      }));
+    }
+
+    async function quickStepStock(id, delta) {
+      const p = products.find((x) => x.id === id);
+      if (!p || !sb) return;
+      const prev = Number(p.stock) || 0;
+      const next = Math.max(0, prev + delta);
+      if (next === prev) return;
+      p.stock = next;
+      renderList();
+      const { error } = await sb.from('products').update({ stock: next }).eq('id', id);
+      if (error) { p.stock = prev; renderList(); toast('Ошибка обновления остатка: ' + error.message); }
+    }
+
+    function renderMediaPreview() {
+      const box = document.getElementById('mediaPreview');
+      if (editorMedia.length === 0) {
+        box.innerHTML = '<div class="col-span-full py-3 text-center text-xs text-zinc-400">Загрузите фото или видео товара</div>';
+        return;
+      }
+      box.innerHTML = editorMedia.map((m, i) => `
+        <div class="relative aspect-[4/3] rounded-xl overflow-hidden border border-black/[0.08] dark:border-white/[0.1] bg-zinc-200 dark:bg-zinc-900">
+          ${m.type === 'video' ? `<video src="${esc(m.url)}" class="w-full h-full object-cover" muted></video>` : `<img src="${esc(m.url)}" class="w-full h-full object-cover" />`}
+          ${i === 0 ? '<span class="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-white text-[9px] font-bold">Главное</span>' : ''}
+          <button type="button" data-rm="${i}" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 hover:bg-rose-600 text-white text-xs">✕</button>
+        </div>`).join('');
+      box.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { editorMedia.splice(Number(b.getAttribute('data-rm')), 1); renderMediaPreview(); }));
+    }
+
+    function openEditor(id) {
+      document.getElementById('productForm').reset();
+      if (id) {
+        const p = products.find((x) => x.id === id);
+        if (!p) return;
+        document.getElementById('editorTitle').textContent = 'Редактировать товар';
+        document.getElementById('prodId').value = p.id;
+        document.getElementById('fTitleRu').value = p.title_ru || '';
+        document.getElementById('fTitleKz').value = p.title_kz || '';
+        document.getElementById('fPrice').value = p.price ?? 0;
+        document.getElementById('fOldPrice').value = p.old_price || '';
+        document.getElementById('fStock').value = p.stock ?? 1;
+        document.getElementById('fSku').value = p.sku || '';
+        document.getElementById('fCategory').value = p.category || '';
+        document.getElementById('fLeadTime').value = p.lead_time || '';
+        document.getElementById('fDescRu').value = p.desc_ru || '';
+        document.getElementById('fDescKz').value = p.desc_kz || '';
+        document.getElementById('fSpecs').value = (Array.isArray(p.specs) ? p.specs : []).filter((s) => Array.isArray(s) && s.length >= 2).map(([k, v]) => `${k}: ${v}`).join('\n');
+        updateConditionUI(p.condition || 'Новый');
+        updateAvailabilityUI(isPreorderRow(p) ? 'preorder' : 'in_stock');
+        editorMedia = JSON.parse(JSON.stringify(p.media || []));
+      } else {
+        document.getElementById('editorTitle').textContent = 'Новый товар';
+        document.getElementById('prodId').value = '';
+        document.getElementById('fStock').value = 1;
+        document.getElementById('fLeadTime').value = '';
+        updateConditionUI('Новый');
+        updateAvailabilityUI('in_stock');
+        editorMedia = [];
+      }
+      updateLivePriceTags();
+      renderMediaPreview();
+      document.getElementById('editorModal').classList.remove('hidden');
+    }
+
+    async function uploadToStorage(file) {
+      if (!sb) { toast('Сначала войдите в базу'); return null; }
+      if (file.size > 50 * 1024 * 1024) { toast('Файл больше 50 МБ — сожмите перед загрузкой'); return null; }
+      try {
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+        const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await sb.storage.from('fixit-media').upload(path, file);
+        if (error) { toast('Ошибка загрузки: ' + error.message); return null; }
+        const { data } = sb.storage.from('fixit-media').getPublicUrl(path);
+        return data ? data.publicUrl : null;
+      } catch (err) {
+        toast('Сбой загрузки файла: ' + (err && err.message ? err.message : 'повторите попытку'));
+        return null;
+      }
+    }
+
+    // Event bindings
+    document.getElementById('themeToggleBtn').addEventListener('click', () => { theme = theme === 'dark' ? 'light' : 'dark'; applyTheme(); });
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => setTab(b.getAttribute('data-tab'))));
+    document.querySelectorAll('[data-cond-pick]').forEach((b) => b.addEventListener('click', () => updateConditionUI(b.getAttribute('data-cond-pick'))));
+    document.querySelectorAll('[data-avail-pick]').forEach((b) => b.addEventListener('click', () => updateAvailabilityUI(b.getAttribute('data-avail-pick'))));
+    document.querySelectorAll('[data-lead-chip]').forEach((b) => b.addEventListener('click', () => { document.getElementById('fLeadTime').value = b.getAttribute('data-lead-chip'); }));
+    document.getElementById('fPrice').addEventListener('input', updateLivePriceTags);
+    document.getElementById('fOldPrice').addEventListener('input', updateLivePriceTags);
+
+    let searchTimer = null;
+    document.getElementById('adminSearchInput').addEventListener('input', (e) => {
+      adminSearch = e.target.value;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(renderList, 110);
+    });
+    document.getElementById('adminStatusFilter').addEventListener('change', (e) => { adminStatusFilter = e.target.value; renderList(); });
+
+    bindColorPair('uiAccentColor', 'uiAccentHex');
+    bindColorPair('uiHeroBgColor', 'uiHeroBgHex');
+    bindColorPair('uiHeroTextColor', 'uiHeroTextHex');
+    bindColorPair('uiTextLightColor', 'uiTextLightHex');
+    bindColorPair('uiTextDarkColor', 'uiTextDarkHex');
+    bindColorPair('uiPageBgLightColor', 'uiPageBgLightHex');
+    bindColorPair('uiPageBgDarkColor', 'uiPageBgDarkHex');
+    bindColorPair('uiBadgeUsedColor', 'uiBadgeUsedHex');
+    bindColorPair('uiBadgePartsColor', 'uiBadgePartsHex');
+    bindColorPair('uiBadgePreorderColor', 'uiBadgePreorderHex');
+
+    // Eye toggles ONLY for URL, Key, and Email (never Password)
+    const eyeOpenSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const eyeOffSvg = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
+    document.querySelectorAll('[data-eye-target]').forEach((btn) => {
+      const target = document.getElementById(btn.getAttribute('data-eye-target'));
+      if (!target) return;
+      const syncIcon = () => { btn.innerHTML = target.type === 'password' ? eyeOpenSvg : eyeOffSvg; };
+      syncIcon();
+      btn.addEventListener('click', () => { target.type = target.type === 'password' ? 'text' : 'password'; syncIcon(); });
+    });
+
+    document.getElementById('toggleKeysBtn').addEventListener('click', () => {
+      const box = document.getElementById('cloudKeyFields');
+      const hidden = box.classList.toggle('hidden');
+      document.getElementById('toggleKeysBtn').textContent = hidden
+        ? 'Показать настройки подключения (URL и ключ)'
+        : 'Скрыть настройки подключения';
+    });
+
+    document.getElementById('uiShopName').addEventListener('input', () => { document.getElementById('setShopName').value = document.getElementById('uiShopName').value; syncColorPreview(); });
+    document.getElementById('setShopName').addEventListener('input', () => { document.getElementById('uiShopName').value = document.getElementById('setShopName').value; syncColorPreview(); });
+    document.getElementById('uiLogoText').addEventListener('input', syncColorPreview);
+    document.querySelectorAll('[data-accent-preset]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const hex = b.getAttribute('data-accent-preset');
+        document.getElementById('uiAccentColor').value = hex;
+        document.getElementById('uiAccentHex').value = hex;
+        syncColorPreview();
+      });
+    });
+
+    document.getElementById('resetColorsBtn').addEventListener('click', () => {
+      populateSiteContent({
+        ...collectSiteContent(),
+        accentColor: '#00AE42', heroBgColor: '#111113', heroTextColor: '#FFFFFF',
+        textColorLight: '#111113', textColorDark: '#F5F5F7',
+        pageBgLight: '#FFFFFF', pageBgDark: '#0A0A0B',
+        badgeUsedColor: '#F97316', badgePartsColor: '#DC2626', badgePreorderColor: '#2563EB',
+      });
+      toast('Цвета сброшены по умолчанию');
+    });
+
+    document.getElementById('resetLabelsBtn').addEventListener('click', () => {
+      CUSTOM_LABELS_SPEC.forEach(([key]) => { const inp = document.getElementById('ui_' + key); if (inp) inp.value = ''; });
+      toast('Названия блоков сброшены по умолчанию');
+    });
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('loginBtn');
+      const url = normalizeSbUrl(document.getElementById('sbUrlInput').value);
+      const key = document.getElementById('sbKeyInput').value.trim();
+      const email = document.getElementById('emailInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      if (!url || !key || !email || !password) { toast('Заполните все поля'); return; }
+      btn.disabled = true;
+      btn.textContent = 'Вход...';
+      try {
+        safeSave('fixit_adm_cfg', { url, key });
+        sb = window.supabase.createClient(url, key);
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) { toast('Ошибка входа: ' + error.message); return; }
+        showDashboard();
+        await refreshData();
+        toast('Вход выполнен');
+      } catch (err) {
+        toast('Ошибка подключения: ' + (err && err.message ? err.message : 'проверьте URL и ключ'));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Войти';
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try { if (sb) await sb.auth.signOut(); } catch (e) {}
+      document.getElementById('dashboardSection').classList.add('hidden');
+      document.getElementById('logoutBtn').classList.add('hidden');
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('connDot').className = 'w-1.5 h-1.5 rounded-full bg-amber-400';
+      document.getElementById('connStatusBadge').textContent = 'Ожидание входа';
+    });
+
+    document.getElementById('addCategoryBtn').addEventListener('click', async () => {
+      const ru = document.getElementById('newCatRu').value.trim();
+      const kz = document.getElementById('newCatKz').value.trim() || ru;
+      if (!ru) return;
+      if (!categories.some((c) => c.id.toLowerCase() === ru.toLowerCase())) {
+        categories.push({ id: ru, ru, kz });
+        document.getElementById('newCatRu').value = '';
+        document.getElementById('newCatKz').value = '';
+        renderCategories();
+        await saveSettingsRow();
+      }
+    });
+
+    document.getElementById('addProductBtn').addEventListener('click', () => openEditor(null));
+    document.getElementById('closeEditorBtn').addEventListener('click', () => document.getElementById('editorModal').classList.add('hidden'));
+    document.getElementById('cancelEditorBtn').addEventListener('click', () => document.getElementById('editorModal').classList.add('hidden'));
+
+    document.getElementById('uploadPhoto').addEventListener('change', async (e) => {
+      for (const f of Array.from(e.target.files || [])) {
+        toast('Загрузка фото...');
+        const url = await uploadToStorage(f);
+        if (url) editorMedia.push({ type: 'image', url });
+      }
+      e.target.value = ''; renderMediaPreview();
+    });
+    document.getElementById('uploadVideo').addEventListener('change', async (e) => {
+      for (const f of Array.from(e.target.files || [])) {
+        toast('Загрузка видео...');
+        const url = await uploadToStorage(f);
+        if (url) editorMedia.push({ type: 'video', url });
+      }
+      e.target.value = ''; renderMediaPreview();
+    });
+
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!sb) { toast('Нет подключения к базе'); return; }
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Сохранение...'; }
+      try {
+        const catVal = document.getElementById('fCategory').value.trim() || 'Запчасти';
+        if (!categories.some((c) => c.id.toLowerCase() === catVal.toLowerCase())) {
+          categories.push({ id: catVal, ru: catVal, kz: catVal });
+          renderCategories();
+          await saveSettingsRow();
+        }
+        const specs = document.getElementById('fSpecs').value.trim().split('\n')
+          .map((l) => l.split(':').map((s) => s.trim())).filter((a) => a.length >= 2 && a[0] && a[1]).map((a) => [a[0], a.slice(1).join(': ')]);
+
+        const editId = document.getElementById('prodId').value;
+        const existing = editId ? products.find((x) => x.id === editId) : null;
+        const avail = document.getElementById('fAvailability').value || 'in_stock';
+        const row = {
+          id: editId || ('fx-' + Date.now().toString(36)),
+          sku: document.getElementById('fSku').value.trim(),
+          title_ru: document.getElementById('fTitleRu').value.trim(),
+          title_kz: document.getElementById('fTitleKz').value.trim(),
+          price: Math.max(0, Number(document.getElementById('fPrice').value) || 0),
+          old_price: Math.max(0, Number(document.getElementById('fOldPrice').value) || 0),
+          stock: Math.max(0, parseInt(document.getElementById('fStock').value, 10) || 0),
+          category: catVal,
+          condition: document.getElementById('fCondition').value || 'Новый',
+          availability: avail,
+          lead_time: avail === 'preorder' ? document.getElementById('fLeadTime').value.trim() : '',
+          desc_ru: document.getElementById('fDescRu').value.trim(),
+          desc_kz: document.getElementById('fDescKz').value.trim(),
+          specs,
+          media: editorMedia,
+          created_at: existing && existing.created_at ? Number(existing.created_at) : Math.floor(Date.now() / 1000),
+        };
+        let { error } = await sb.from('products').upsert(row);
+        if (error && /schema cache|column/i.test(String(error.message || ''))) {
+          const fallbackRow = { ...row };
+          delete fallbackRow.availability;
+          delete fallbackRow.lead_time;
+          const retry = await sb.from('products').upsert(fallbackRow);
+          if (!retry.error) {
+            document.getElementById('editorModal').classList.add('hidden');
+            toast('Товар сохранён! Выполните supabase_setup.sql для полей «Под заказ».');
+            refreshData();
+            return;
+          }
+          error = retry.error;
+        }
+        if (error) { toast('Ошибка БД: ' + error.message); return; }
+        document.getElementById('editorModal').classList.add('hidden');
+        toast('Сохранено! Витрина обновлена.');
+        refreshData();
+      } catch (err) {
+        toast('Сбой сохранения: ' + (err && err.message ? err.message : 'проверьте сеть'));
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Сохранить в базу'; }
+      }
+    });
+
+    document.getElementById('editorModal').addEventListener('click', (e) => { if (e.target.id === 'editorModal') e.target.classList.add('hidden'); });
+    document.getElementById('confirmModal').addEventListener('click', (e) => { if (e.target.id === 'confirmModal') e.target.classList.add('hidden'); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('editorModal').classList.add('hidden');
+        document.getElementById('confirmModal').classList.add('hidden');
+      }
+    });
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettingsRow);
+    document.getElementById('saveContentBtn').addEventListener('click', saveSettingsRow);
+    document.getElementById('confirmCancelBtn').addEventListener('click', () => document.getElementById('confirmModal').classList.add('hidden'));
+    document.getElementById('confirmOkBtn').addEventListener('click', async () => {
+      document.getElementById('confirmModal').classList.add('hidden');
+      if (confirmAction) await confirmAction();
+    });
+
+    // Init
+    theme = safeLoad('fixit_adm_clean_theme', 'light');
+    applyTheme();
+    populateSiteContent({});
+    const savedCfg = safeLoad('fixit_adm_cfg', { url: '', key: '' });
+    const activeUrl = CLOUD_CONFIG.supabaseUrl || savedCfg.url || '';
+    const activeKey = CLOUD_CONFIG.supabaseAnonKey || savedCfg.key || '';
+    document.getElementById('sbUrlInput').value = activeUrl;
+    document.getElementById('sbKeyInput').value = activeKey;
+    if (CLOUD_CONFIG.supabaseUrl && CLOUD_CONFIG.supabaseAnonKey) {
+      document.getElementById('cloudKeyFields').classList.add('hidden');
+    } else {
+      document.getElementById('toggleKeysBtn').classList.add('hidden');
+    }
+    if (activeUrl && activeKey) connectAndLoad(activeUrl, activeKey);
+  </script>
+</body>
+</html>
